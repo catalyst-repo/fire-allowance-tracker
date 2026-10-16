@@ -38,7 +38,7 @@ manifest:
 | Which PostgreSQL schema does the app own? | `database.schema` |
 | Which Linear team and app label route this work? | `linear.team` / `linear.team_key` / `linear.app_label` |
 
-For this repository those resolve to: repository `Tinnaz45/fire-allowance-tracker`,
+For this repository those resolve to: repository `catalyst-repo/fire-allowance-tracker`,
 dev branch `dev`, production branch `main`, database schema **`fat`**, Linear
 team **Workshop** (`WORK`) with app label **Fire Allowance Tracker**. Workshop
 was formerly the Applications team (`APP`); historical `APP-<n>` identifiers
@@ -135,7 +135,7 @@ the same loop:
    instruction is visible rather than lost.
 
    This repository carries no Catalyst resolver — the plugin lives in
-   `Tinnaz45/governance-system` — so the run derives that branch itself with plain
+   `catalyst-repo/governance` — so the run derives that branch itself with plain
    `git`. The absence of the tool is not an exemption (`CORE_RULES.md § 8.2.1.2`).
    **Never commit or push on the designated branch.** A repository-side head-branch
    check is a backstop that fires after the work is already committed and pushed on

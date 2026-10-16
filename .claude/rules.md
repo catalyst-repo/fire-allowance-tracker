@@ -17,7 +17,7 @@ type: project
 this app's identity and routing. Take these from the manifest, never from memory
 or folder names:
 
-- `repository` — **`Tinnaz45/fire-allowance-tracker`**
+- `repository` — **`catalyst-repo/fire-allowance-tracker`**
 - `branches.dev` / `branches.production` — **`dev`** / **`main`**
 - `database.schema` — **`fat`**
 - `linear.team` / `linear.team_key` / `linear.app_label` — **Workshop** / **`WORK`** / **Fire Allowance Tracker**
