@@ -142,15 +142,36 @@ cutover preparation, the routing switch, every Production action, and:
 - Vercel function region. The project currently runs functions in `iad1`, while Neon is in
   `aws-ap-southeast-2`; each member request opens a transaction across the Pacific. Pin functions
   to `syd1` before Production.
-- Neon Auth trusted domains for the Production origin. DEV trusts only the WORK-256 Preview
-  branch alias, plus localhost through the provider's localhost setting.
+- Neon Auth trusted domains for the Production origin. DEV (Neon `dev` branch
+  `br-wispy-dew-a7vd4v6k` only) trusts exactly two Preview origins, plus localhost through the
+  provider's localhost setting:
+  - `https://fire-allowance-tracker-git-dev-catalystappdev.vercel.app` — the `dev` branch
+    Preview alias, added after the PR #48 merge (r5, 2026-10-16);
+  - `https://fire-allowance-tracker-git-task-work-256-8c1341-catalystappdev.vercel.app` — the
+    original PR #48 task-branch alias (r4, 2026-10-06), kept unchanged.
+
+  Neon Auth checks the browser `Origin` before credentials, so any other Preview alias is refused
+  with `403 INVALID_ORIGIN`. A new branch Preview that must sign in needs its own preflighted
+  DEV trusted-origin change. `main` has no Neon Auth.
 
 ## 8. Environment variables (server-only unless noted)
 
 FAT convention: every application-specific variable carries the `FAT_` prefix. The environment
 is the **Vercel scope**, never part of the key — e.g. `FAT_DATABASE_URL — Preview` and, later,
-`FAT_DATABASE_URL — Production` are the same key in two scopes. WORK-256 sets **Preview only**
-(branch `task/WORK-256-neon-dev-app-auth`); no Production variable exists or is created.
+`FAT_DATABASE_URL — Production` are the same key in two scopes. WORK-256 sets **Preview only**;
+no Production variable exists or is created.
+
+The variables were first scoped to the PR #48 task branch `task/WORK-256-neon-dev-app-auth`. Since
+the merge, the operator has configured them for the `dev` branch Preview (as reported by the
+operator, 2026-10-16; values are never in the repository):
+
+- branch-scoped to `dev`: `FAT_BACKEND`, `FAT_DATABASE_URL`, `FAT_NEON_AUTH_BASE_URL`;
+- all Preview deployments: `FAT_DATABASE_SERVICE_URL`, `FAT_NEON_AUTH_COOKIE_SECRET`.
+
+So only a `dev` Preview (and any branch given its own `FAT_BACKEND=neon`) runs in Neon mode. Other
+Preview branches stay on the default Supabase path, because `FAT_BACKEND` is unset there. The
+verified `dev` deployment is `dpl_A5dd9vJRKYDvRoFBTLWD1QZ7d5ga` (commit `28f6d31`); see
+`docs/evidence/WORK-256/README.md` § Deployed `dev`.
 
 | Key — scope | Value |
 |---|---|

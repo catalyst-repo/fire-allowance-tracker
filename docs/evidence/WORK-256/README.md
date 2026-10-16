@@ -15,6 +15,7 @@ verified after it was applied.
 | `r2-role-credentials` | `auth-config` `fat-dev-app-server-credentials-20261006` (role passwords; functional login proof) | allow | verified |
 | `r3-neon-auth` | `auth-config` `fat-dev-neon-auth-20261006` (Neon Auth on `dev`) | allow | verified |
 | `r4-preview-trusted-domain` | `auth-config` `fat-dev-neon-auth-preview-origin-20261006` (Neon Auth `dev` trusts the PR #48 Preview branch alias; the adapter forwards the browser Origin) | allow | verified |
+| `r5-dev-preview-trusted-domain` | `auth-config` `fat-dev-neon-auth-dev-preview-origin-20261016` (after the PR #48 merge, Neon Auth `dev` also trusts the `dev` branch Preview alias; added, the r4 origin kept) | allow | verified |
 
 Negative checks:
 
@@ -105,3 +106,25 @@ The server variables follow the FAT `FAT_` prefix convention: `FAT_DATABASE_URL`
 unchanged `FAT_BACKEND`. The environment is the Vercel scope (e.g. `FAT_DATABASE_URL — Preview`),
 never part of the key. Every proof in this directory was re-run after the rename against the
 same Neon `dev` target; `__tests__/neon-env-contract.test.mjs` pins the names.
+
+## Deployed `dev` (2026-10-16, after the PR #48 merge)
+
+Target: Vercel Preview `dpl_A5dd9vJRKYDvRoFBTLWD1QZ7d5ga`, branch `dev`, commit `28f6d31` (the
+PR #48 squash, tree identical to the accepted head `1f84245`), alias
+`https://fire-allowance-tracker-git-dev-catalystappdev.vercel.app`. Same Neon `dev` target and the
+same scripts as above, unchanged, run against the deployed alias with synthetic users.
+
+- **Neon mode.** `GET /api/auth/get-session` returns `200` answered by Neon Auth (it returned
+  `404 NOT_FOUND` on the earlier Supabase-mode `dev` build `dpl_HRn1X6uof2gkUU7HAEmEKVAFxYqs`,
+  before the operator set the `dev` Preview variables).
+- **Origin gate.** Sign-in was first refused with `403 INVALID_ORIGIN`, because only the r4 task
+  alias was trusted. r5 added the `dev` alias, and a probe sign-in then returned
+  `401 INVALID_EMAIL_OR_PASSWORD` (origin accepted).
+- **`deployed-dev/e2e-report.json`** — `scripts/neon-dev-e2e.mjs`, run `dev121254`: **87/87**
+  (auth 12, identity 5, A↔B isolation 10, claims 24, rule values 13, override 5, delete 2,
+  numbering 1, Payments dark 2, surface 2, others 11). The rule values match the accepted run.
+  The authenticated traffic proves the Vercel-held credentials for both login roles.
+- **`deployed-dev/ui-smoke-report.json`** — `ui-smoke/ui-smoke.mjs` in Chromium: **19/19**. The
+  only external host is `vercel.live` (the Vercel Preview toolbar); no Supabase traffic.
+- **Unchanged.** `main` stays `0f80f5b`, Neon `main` has 0 user tables, and Supabase and Vercel
+  Production were not touched.

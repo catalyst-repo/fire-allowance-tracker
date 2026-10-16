@@ -1,0 +1,16 @@
+{
+ "target": { "app": "fire-allowance-tracker", "provider": "neon", "project": "cool-meadow-70196410", "target": "dev", "targetId": "br-wispy-dew-a7vd4v6k", "role": "dev", "backend": "owned", "operation": "auth-config", "change": "fat-dev-neon-auth-dev-preview-origin-20261016" },
+ "change": "fat-dev-neon-auth-dev-preview-origin-20261016",
+ "observed": { "adapter": "neon", "raw": { "id": "br-wispy-dew-a7vd4v6k", "project_id": "cool-meadow-70196410", "name": "dev", "parent_id": "br-red-credit-a77927m4" } },
+ "applied": [ "fat-dev-neon-auth-dev-preview-origin-20261016" ],
+ "readAt": "2026-10-16T03:27:20Z",
+ "evidence": {
+  "source": "list_auth_trusted_domains(cool-meadow-70196410, br-wispy-dew-a7vd4v6k)",
+  "trusted_domains": [
+   { "domain": "https://fire-allowance-tracker-git-task-work-256-8c1341-catalystappdev.vercel.app", "auth_provider": "better_auth" },
+   { "domain": "https://fire-allowance-tracker-git-dev-catalystappdev.vercel.app", "auth_provider": "better_auth" }
+  ],
+  "purpose": "Vercel Preview alias for branch dev (WORK-256 deployed-dev acceptance) — DEV Neon Auth only; existing origin preserved",
+  "main_branch_get_auth": "HTTP 404 Neon Auth is not enabled for this branch"
+ }
+}
