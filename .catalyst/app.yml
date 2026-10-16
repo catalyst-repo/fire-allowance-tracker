@@ -16,8 +16,9 @@ name: Fire Allowance Tracker
 
 # owner/repo exactly as GitHub renders it — the canonical catalyst/app@1 string
 # shape that the governance locator compares by equality (GOV-327). The repository
-# was transferred to Tinnaz45 under APP-116.
-repository: Tinnaz45/fire-allowance-tracker
+# was transferred to Tinnaz45 under APP-116, then moved to the catalyst-repo owner
+# by a GitHub owner rename (same repository ID 1202410718; verified under WORK-276).
+repository: catalyst-repo/fire-allowance-tracker
 repository_visibility: public
 
 # Normal two-branch application: ordinary work lands on `dev` via PR;
