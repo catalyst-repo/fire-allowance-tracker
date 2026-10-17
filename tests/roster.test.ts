@@ -318,3 +318,40 @@ test("Day Work ending at 18:30 is rejected without dropping night hours", () => 
     /Day Work must/,
   );
 });
+test("gear reminders are identical for whole and split request windows", () => {
+  const base = {
+    platoon: "A" as const,
+    stations: [
+      { stationId: 1, from: "2026-01-01" },
+      { stationId: 5, from: "2026-01-11" },
+    ],
+  };
+  const whole = generateRoster({
+    ...base,
+    from: "2026-01-03",
+    to: "2026-01-20",
+  }).gearReminders;
+  const split = [
+    ...generateRoster({ ...base, from: "2026-01-03", to: "2026-01-10" })
+      .gearReminders,
+    ...generateRoster({ ...base, from: "2026-01-11", to: "2026-01-20" })
+      .gearReminders,
+  ];
+  assert.deepEqual(split, whole);
+});
+test("leave is a Melbourne calendar-date interval; night fragments are clipped hourly", () => {
+  const d = "2026-01-05";
+  const p = resolveNightPlatoon(d) as "A" | "B" | "C" | "D";
+  const r = generateRoster({
+    platoon: p,
+    from: d,
+    to: d,
+    leave: [
+      { period: "L", startingRosterBlock: rosterBlock(d), start: d, end: d },
+    ],
+  });
+  const n = r.shifts.find((x) => x.kind === "Night");
+  assert.ok(n);
+  assert.equal(n.start, instant("2026-01-06", 0));
+  assert.equal(n.end, instant("2026-01-06", 8));
+});

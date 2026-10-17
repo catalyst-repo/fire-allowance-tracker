@@ -48,20 +48,19 @@ const validDate = (d: string) => {
 const date = (t: number) => new Date(t).toISOString().slice(0, 10);
 export const rosterBlock = (d: string) =>
   1654 + Math.floor((validDate(d) - ANCHOR) / (28 * DAY));
+const melbourneFormatter = new Intl.DateTimeFormat("en-AU", {
+  timeZone: "Australia/Melbourne",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  second: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
 const offset = (t: number) => {
   const p = Object.fromEntries(
-    new Intl.DateTimeFormat("en-AU", {
-      timeZone: "Australia/Melbourne",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      second: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    })
-      .formatToParts(t)
-      .map((x) => [x.type, Number(x.value)]),
+    melbourneFormatter.formatToParts(t).map((x) => [x.type, Number(x.value)]),
   );
   return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - t;
 };
@@ -123,7 +122,10 @@ function station(s: Shift, all: Station[]) {
       a.stationId - b.stationId,
   )[0];
 }
-export function generateRoster(i: Input): {
+export function generateRoster(
+  i: Input,
+  internal = false,
+): {
   shifts: Shift[];
   gearReminders: Reminder[];
 } {
@@ -131,7 +133,25 @@ export function generateRoster(i: Input): {
     throw Error("Invalid platoon");
   const from = validDate(i.from),
     to = validDate(i.to);
-  if (to < from || to - from > 5 * 366 * DAY) throw Error("Invalid range");
+  if (to < from || (!internal && to - from > 5 * 366 * DAY))
+    throw Error("Invalid range");
+  // Expand only the calculation horizon, not the returned shifts, so the
+  // last old-station shift and first new-station shift remain visible across
+  // independent windows. A 16-day lookaround covers the 8-day platoon cycle.
+  if (!internal) {
+    const before = date(from - 16 * DAY);
+    const after = date(to + 16 * DAY);
+    const expanded = generateRoster({ ...i, from: before, to: after }, true);
+    const boundaryEnd = Date.parse(instant(date(to + DAY), 0));
+    const boundaryStart = Date.parse(instant(i.from, 0));
+    return {
+      shifts: expanded.shifts.filter((s) => s.date >= i.from && s.date <= i.to),
+      gearReminders: expanded.gearReminders.filter(
+        (r) =>
+          Date.parse(r.at) >= boundaryStart && Date.parse(r.at) < boundaryEnd,
+      ),
+    };
+  }
   const leave = intervals(
     (i.leave || []).map((l) => {
       if (
