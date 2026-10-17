@@ -355,3 +355,31 @@ test("leave is a Melbourne calendar-date interval; night fragments are clipped h
   assert.equal(n.start, instant("2026-01-06", 0));
   assert.equal(n.end, instant("2026-01-06", 8));
 });
+test("long leave preserves identical split-window gear reminders", () => {
+  const stations = [
+    { stationId: 1, from: "2026-01-01" },
+    { stationId: 5, from: "2026-02-01" },
+  ];
+  const leave = [
+    {
+      period: "L",
+      startingRosterBlock: rosterBlock("2026-01-13"),
+      start: "2026-01-13",
+      end: "2026-02-09",
+    },
+  ];
+  const base = { platoon: "A" as const, stations, leave };
+  const whole = generateRoster({
+    ...base,
+    from: "2026-01-01",
+    to: "2026-02-28",
+  }).gearReminders;
+  const split = [
+    ...generateRoster({ ...base, from: "2026-01-01", to: "2026-01-12" })
+      .gearReminders,
+    ...generateRoster({ ...base, from: "2026-01-13", to: "2026-02-28" })
+      .gearReminders,
+  ];
+  assert.deepEqual(split, whole);
+  assert.ok(whole.some((x) => x.title === "Move FF Gear to FS5"));
+});

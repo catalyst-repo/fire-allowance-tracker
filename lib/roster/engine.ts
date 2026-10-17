@@ -139,8 +139,18 @@ export function generateRoster(
   // last old-station shift and first new-station shift remain visible across
   // independent windows. A 16-day lookaround covers the 8-day platoon cycle.
   if (!internal) {
-    const before = date(from - 16 * DAY);
-    const after = date(to + 16 * DAY);
+    const maximumLeaveDays = Math.max(
+      0,
+      ...(i.leave || []).map((l) =>
+        Math.max(
+          0,
+          Math.round((validDate(l.end) - validDate(l.start)) / DAY) + 1,
+        ),
+      ),
+    );
+    const pad = 16 + maximumLeaveDays;
+    const before = date(from - pad * DAY);
+    const after = date(to + pad * DAY);
     const expanded = generateRoster({ ...i, from: before, to: after }, true);
     const boundaryEnd = Date.parse(instant(date(to + DAY), 0));
     const boundaryStart = Date.parse(instant(i.from, 0));
