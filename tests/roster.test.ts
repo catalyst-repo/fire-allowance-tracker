@@ -217,3 +217,57 @@ test("overlapping Day Work records are refused", () => {
     /Overlapping Day Work/,
   );
 });
+test("out-of-hours Day Work is refused rather than deleting hours", () => {
+  const d = "2026-01-05";
+  assert.throws(
+    () =>
+      generateRoster({
+        platoon: "A",
+        from: d,
+        to: d,
+        dayWork: [{ start: instant(d, 18), end: instant(d, 20) }],
+      }),
+    /Day Work must/,
+  );
+});
+test("offsetless intervals are rejected for deterministic timezones", () => {
+  assert.throws(
+    () =>
+      generateRoster({
+        platoon: "A",
+        from: "2026-01-03",
+        to: "2026-01-03",
+        dayWork: [{ start: "2026-01-03T08:00", end: "2026-01-03T18:00" }],
+      }),
+    /Explicit timezone/,
+  );
+});
+test("fragment keys change with fragment start", () => {
+  const d = "2026-01-05";
+  const p = resolveNightPlatoon(d) as "A" | "B" | "C" | "D";
+  const full = generateRoster({ platoon: p, from: d, to: d }).shifts.find(
+    (x) => x.kind === "Night",
+  );
+  const clipped = generateRoster({
+    platoon: p,
+    from: d,
+    to: d,
+    leave: [
+      { period: "x", startingRosterBlock: rosterBlock(d), start: d, end: d },
+    ],
+  }).shifts.find((x) => x.kind === "Night");
+  assert.ok(full && clipped);
+  assert.notEqual(full.key, clipped.key);
+});
+test("temporary station departure receives a gear reminder", () => {
+  const r = generateRoster({
+    platoon: "A",
+    from: "2026-01-03",
+    to: "2026-01-12",
+    stations: [
+      { stationId: 1, from: "2026-01-01" },
+      { stationId: 22, from: "2026-01-05", to: "2026-01-06", temporary: true },
+    ],
+  });
+  assert.ok(r.gearReminders.some((x) => x.title === "Move FF Gear to FS1"));
+});

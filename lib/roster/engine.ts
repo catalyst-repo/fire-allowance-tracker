@@ -75,6 +75,11 @@ export function instant(d: string, h: number): string {
 type Window = { start: string; end: string };
 function intervals(windows: Window[]) {
   return windows.map((w) => {
+    if (
+      !/(Z|[+-]\d{2}:\d{2})$/.test(w.start) ||
+      !/(Z|[+-]\d{2}:\d{2})$/.test(w.end)
+    )
+      throw Error("Explicit timezone required");
     const a = Date.parse(w.start),
       b = Date.parse(w.end);
     if (!Number.isFinite(a) || !Number.isFinite(b) || a >= b)
@@ -98,7 +103,7 @@ function cut(shift: Shift, windows: [number, number][]): Shift[] {
   }
   return pieces.map(([a, b], j) => ({
     ...shift,
-    key: shift.key + ":" + j,
+    key: shift.key + ":" + new Date(a).toISOString(),
     start: new Date(a).toISOString(),
     end: new Date(b).toISOString(),
   }));
@@ -143,6 +148,34 @@ export function generateRoster(i: Input): {
     }),
   );
   const work = intervals(i.dayWork || []);
+  for (const [a, b] of work) {
+    const part = (t: number) =>
+      Object.fromEntries(
+        new Intl.DateTimeFormat("en-GB", {
+          timeZone: "Australia/Melbourne",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23",
+        })
+          .formatToParts(t)
+          .map((x) => [x.type, x.value]),
+      );
+    const x = part(a),
+      y = part(b);
+    if (
+      x.year !== y.year ||
+      x.month !== y.month ||
+      x.day !== y.day ||
+      Number(x.hour) < 8 ||
+      Number(y.hour) > 18 ||
+      Number(x.hour) >= 18 ||
+      Number(y.hour) < 8
+    )
+      throw Error("Day Work must be within 08:00-18:00 on one Melbourne date");
+  }
   const ordered = [...work].sort((a, b) => a[0] - b[0]);
   for (let k = 1; k < ordered.length; k++)
     if (ordered[k][0] < ordered[k - 1][1])
@@ -198,7 +231,7 @@ export function generateRoster(i: Input): {
         end = Date.parse(instant(d, 18));
       if (start >= b || end <= a) continue;
       const s: Shift = {
-        key: i.platoon + ":" + d + ":Day Work:" + k,
+        key: i.platoon + ":" + d + ":Day Work:" + new Date(a).toISOString(),
         date: d,
         kind: "Day Work",
         block: rosterBlock(d),
@@ -226,7 +259,7 @@ export function generateRoster(i: Input): {
       a.stationId !== b.stationId &&
       !old?.oneShiftRelief &&
       !next?.oneShiftRelief &&
-      old?.temporary !== true
+      true
     ) {
       gearReminders.push({
         key: "gear:" + a.key + ":" + b.stationId,
