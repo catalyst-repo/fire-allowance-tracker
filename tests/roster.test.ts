@@ -271,3 +271,32 @@ test("temporary station departure receives a gear reminder", () => {
   });
   assert.ok(r.gearReminders.some((x) => x.title === "Move FF Gear to FS1"));
 });
+test("gear reminders skip one-shift relief while preserving home transfer", () => {
+  const r = generateRoster({
+    platoon: "A",
+    from: "2026-01-03",
+    to: "2026-01-12",
+    stations: [
+      { stationId: 1, from: "2026-01-01" },
+      {
+        stationId: 22,
+        from: "2026-01-05",
+        to: "2026-01-05",
+        temporary: true,
+        oneShiftRelief: true,
+      },
+      { stationId: 5, from: "2026-01-06", temporary: true },
+    ],
+  });
+  assert.ok(r.gearReminders.some((x) => x.title === "Move FF Gear to FS5"));
+});
+test("reject malformed one-shift relief allocations", () => {
+  assert.throws(() =>
+    generateRoster({
+      platoon: "A",
+      from: "2026-01-03",
+      to: "2026-01-10",
+      stations: [{ stationId: 22, from: "2026-01-05", oneShiftRelief: true }],
+    }),
+  );
+});

@@ -181,6 +181,10 @@ export function generateRoster(i: Input): {
     if (ordered[k][0] < ordered[k - 1][1])
       throw Error("Overlapping Day Work intervals");
   for (const a of i.stations || []) {
+    if (a.oneShiftRelief && (!a.temporary || !a.to || a.to !== a.from))
+      throw Error("One-shift relief must be temporary and bounded to one date");
+    if (a.block !== undefined && !Number.isInteger(a.block))
+      throw Error("Invalid roster block");
     validDate(a.from);
     if (a.to && validDate(a.to) < validDate(a.from))
       throw Error("Invalid station window");
@@ -247,26 +251,26 @@ export function generateRoster(i: Input): {
   shifts.sort(
     (a, b) => a.start.localeCompare(b.start) || a.key.localeCompare(b.key),
   );
+  // Reminder plans require an observed previous and next non-relief station. The
+  // next station is taken from a shift; unknown boundaries are not guessed.
   const gearReminders: Reminder[] = [];
-  for (let j = 0; j < shifts.length - 1; j++) {
-    const a = shifts[j],
-      b = shifts[j + 1],
-      old = station(a, i.stations || []),
-      next = station(b, i.stations || []);
+  let home: Shift | undefined;
+  for (const shift of shifts) {
+    const allocation = station(shift, i.stations || []);
+    if (allocation?.oneShiftRelief) continue;
     if (
-      a.stationId !== undefined &&
-      b.stationId !== undefined &&
-      a.stationId !== b.stationId &&
-      !old?.oneShiftRelief &&
-      !next?.oneShiftRelief &&
-      true
+      home &&
+      home.stationId !== undefined &&
+      shift.stationId !== undefined &&
+      home.stationId !== shift.stationId
     ) {
       gearReminders.push({
-        key: "gear:" + a.key + ":" + b.stationId,
-        at: a.end,
-        title: "Move FF Gear to FS" + b.stationId,
+        key: "gear:" + home.key + ":" + shift.stationId,
+        at: home.end,
+        title: "Move FF Gear to FS" + shift.stationId,
       });
     }
+    home = shift;
   }
   return { shifts, gearReminders };
 }
