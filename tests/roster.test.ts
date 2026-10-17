@@ -1,16 +1,219 @@
-import test from 'node:test'
-import assert from 'node:assert/strict'
-import {generateRoster,instant,rosterBlock} from '../lib/roster/engine.ts'
-import {resolveDayPlatoon,resolveNightPlatoon} from '../lib/platoon/resolveOperationalPlatoon.js'
-test('four platoons match authoritative resolver for 3200 days',()=>{for(let j=0;j<3200;j++){const date=new Date(Date.UTC(2026,0,3)+j*86400000).toISOString().slice(0,10);for(const p of ['A','B','C','D'] as const){const got=generateRoster({platoon:p,from:date,to:date}).shifts;assert.deepEqual(got.map(s=>s.kind),[...(resolveDayPlatoon(date)===p?['Day']:[]),...(resolveNightPlatoon(date)===p?['Night']:[])])}}})
-test('Melbourne daylight saving is timezone-correct',()=>{assert.equal(instant('2027-04-04',18),'2027-04-04T08:00:00.000Z');assert.equal(instant('2027-10-03',18),'2027-10-03T07:00:00.000Z')})
-test('28 day roster blocks',()=>{assert.equal(rosterBlock('2026-10-02'),1654);assert.equal(rosterBlock('2026-10-30'),1655)})
-test('Z day work Monday through Thursday, no holiday suppression',()=>{assert.deepEqual(generateRoster({platoon:'Z',from:'2026-10-19',to:'2026-10-25'}).shifts.map(s=>s.date),['2026-10-19','2026-10-20','2026-10-21','2026-10-22'])})
-test('explicit leave suppresses roster intervals, no automatic recurrence',()=>{const base=generateRoster({platoon:'A',from:'2026-01-03',to:'2026-01-10'});const leave=generateRoster({platoon:'A',from:'2026-01-03',to:'2026-01-10',leave:[{period:'period-1',startingRosterBlock:rosterBlock('2026-01-03'),start:'2026-01-03',end:'2026-01-04'}]});assert.ok(leave.shifts.length<base.shifts.length)})
-test('temporary allocation wins and gear transfer is bounded',()=>{const result=generateRoster({platoon:'A',from:'2026-01-03',to:'2026-01-11',stations:[{stationId:1,from:'2026-01-01'},{stationId:22,from:'2026-01-05',temporary:true}]});assert.ok(result.shifts.some(s=>s.stationId===22));assert.ok(result.gearReminders.some(r=>r.title==='Move FF Gear to FS22'))})
-test('idempotent and invalid input rejected',()=>{const i={platoon:'D' as const,from:'2027-01-01',to:'2027-02-01'};assert.deepEqual(generateRoster(i),generateRoster(i));assert.throws(()=>generateRoster({...i,from:'not-date'}))})
-test('night shift crossing leave midnight is clipped, not retained whole',()=>{const date='2026-01-05';const p=resolveNightPlatoon(date) as 'A'|'B'|'C'|'D';const result=generateRoster({platoon:p,from:date,to:date,leave:[{period:'1',startingRosterBlock:rosterBlock('2026-01-06'),start:'2026-01-06',end:'2026-01-06'}]});const night=result.shifts.find(s=>s.kind==='Night');assert.ok(night);assert.equal(night.end,instant('2026-01-06',0))})
-test('explicit Day Work suppresses operational overlap and generates replacement',()=>{const d='2026-01-03',p=resolveDayPlatoon(d) as 'A'|'B'|'C'|'D';const a=instant(d,8),b=instant(d,18);const r=generateRoster({platoon:p,from:d,to:d,dayWork:[{start:a,end:b}]});assert.equal(r.shifts.filter(s=>s.kind==='Day').length,0);assert.equal(r.shifts.filter(s=>s.kind==='Day Work').length,1)})
-test('leave takes precedence over an explicit Day Work override',()=>{const d='2026-01-03';const r=generateRoster({platoon:'A',from:d,to:d,dayWork:[{start:instant(d,8),end:instant(d,18)}],leave:[{period:'L1',startingRosterBlock:rosterBlock(d),start:d,end:d}]});assert.equal(r.shifts.length,0)})
-test('DST night shifts have correct elapsed hours',()=>{for(const [d,h] of [['2027-04-03',15],['2027-10-02',13]] as const){const p=resolveNightPlatoon(d) as 'A'|'B'|'C'|'D';const r=generateRoster({platoon:p,from:d,to:d});const n=r.shifts.find(s=>s.kind==='Night');assert.ok(n);assert.equal((Date.parse(n.end)-Date.parse(n.start))/3600000,h)}})
-test('station bounds and block allocation precedence',()=>{const d='2026-01-03';assert.throws(()=>generateRoster({platoon:'A',from:d,to:d,stations:[{stationId:97,from:d}]}));const r=generateRoster({platoon:'A',from:d,to:d,stations:[{stationId:1,from:d},{stationId:2,from:d,block:rosterBlock(d)}]});assert.equal(r.shifts[0].stationId,2)})
+import test from "node:test";
+import assert from "node:assert/strict";
+import { generateRoster, instant, rosterBlock } from "../lib/roster/engine.ts";
+import {
+  resolveDayPlatoon,
+  resolveNightPlatoon,
+} from "../lib/platoon/resolveOperationalPlatoon.js";
+test("four platoons match authoritative resolver for 3200 days", () => {
+  for (let j = 0; j < 3200; j++) {
+    const date = new Date(Date.UTC(2026, 0, 3) + j * 86400000)
+      .toISOString()
+      .slice(0, 10);
+    for (const p of ["A", "B", "C", "D"] as const) {
+      const got = generateRoster({ platoon: p, from: date, to: date }).shifts;
+      assert.deepEqual(
+        got.map((s) => s.kind),
+        [
+          ...(resolveDayPlatoon(date) === p ? ["Day"] : []),
+          ...(resolveNightPlatoon(date) === p ? ["Night"] : []),
+        ],
+      );
+    }
+  }
+});
+test("Melbourne daylight saving is timezone-correct", () => {
+  assert.equal(instant("2027-04-04", 18), "2027-04-04T08:00:00.000Z");
+  assert.equal(instant("2027-10-03", 18), "2027-10-03T07:00:00.000Z");
+});
+test("28 day roster blocks", () => {
+  assert.equal(rosterBlock("2026-10-02"), 1654);
+  assert.equal(rosterBlock("2026-10-30"), 1655);
+});
+test("Z day work Monday through Thursday, no holiday suppression", () => {
+  assert.deepEqual(
+    generateRoster({
+      platoon: "Z",
+      from: "2026-10-19",
+      to: "2026-10-25",
+    }).shifts.map((s) => s.date),
+    ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22"],
+  );
+});
+test("explicit leave suppresses roster intervals, no automatic recurrence", () => {
+  const base = generateRoster({
+    platoon: "A",
+    from: "2026-01-03",
+    to: "2026-01-10",
+  });
+  const leave = generateRoster({
+    platoon: "A",
+    from: "2026-01-03",
+    to: "2026-01-10",
+    leave: [
+      {
+        period: "period-1",
+        startingRosterBlock: rosterBlock("2026-01-03"),
+        start: "2026-01-03",
+        end: "2026-01-04",
+      },
+    ],
+  });
+  assert.ok(leave.shifts.length < base.shifts.length);
+});
+test("temporary allocation wins and gear transfer is bounded", () => {
+  const result = generateRoster({
+    platoon: "A",
+    from: "2026-01-03",
+    to: "2026-01-11",
+    stations: [
+      { stationId: 1, from: "2026-01-01" },
+      { stationId: 22, from: "2026-01-05", temporary: true },
+    ],
+  });
+  assert.ok(result.shifts.some((s) => s.stationId === 22));
+  assert.ok(
+    result.gearReminders.some((r) => r.title === "Move FF Gear to FS22"),
+  );
+});
+test("idempotent and invalid input rejected", () => {
+  const i = { platoon: "D" as const, from: "2027-01-01", to: "2027-02-01" };
+  assert.deepEqual(generateRoster(i), generateRoster(i));
+  assert.throws(() => generateRoster({ ...i, from: "not-date" }));
+});
+test("night shift crossing leave midnight is clipped, not retained whole", () => {
+  const date = "2026-01-05";
+  const p = resolveNightPlatoon(date) as "A" | "B" | "C" | "D";
+  const result = generateRoster({
+    platoon: p,
+    from: date,
+    to: date,
+    leave: [
+      {
+        period: "1",
+        startingRosterBlock: rosterBlock("2026-01-06"),
+        start: "2026-01-06",
+        end: "2026-01-06",
+      },
+    ],
+  });
+  const night = result.shifts.find((s) => s.kind === "Night");
+  assert.ok(night);
+  assert.equal(night.end, instant("2026-01-06", 0));
+});
+test("explicit Day Work suppresses operational overlap and generates replacement", () => {
+  const d = "2026-01-03",
+    p = resolveDayPlatoon(d) as "A" | "B" | "C" | "D";
+  const a = instant(d, 8),
+    b = instant(d, 18);
+  const r = generateRoster({
+    platoon: p,
+    from: d,
+    to: d,
+    dayWork: [{ start: a, end: b }],
+  });
+  assert.equal(r.shifts.filter((s) => s.kind === "Day").length, 0);
+  assert.equal(r.shifts.filter((s) => s.kind === "Day Work").length, 1);
+});
+test("leave takes precedence over an explicit Day Work override", () => {
+  const d = "2026-01-03";
+  const r = generateRoster({
+    platoon: "A",
+    from: d,
+    to: d,
+    dayWork: [{ start: instant(d, 8), end: instant(d, 18) }],
+    leave: [
+      { period: "L1", startingRosterBlock: rosterBlock(d), start: d, end: d },
+    ],
+  });
+  assert.equal(r.shifts.length, 0);
+});
+test("DST night shifts have correct elapsed hours", () => {
+  for (const [d, h] of [
+    ["2027-04-03", 15],
+    ["2027-10-02", 13],
+  ] as const) {
+    const p = resolveNightPlatoon(d) as "A" | "B" | "C" | "D";
+    const r = generateRoster({ platoon: p, from: d, to: d });
+    const n = r.shifts.find((s) => s.kind === "Night");
+    assert.ok(n);
+    assert.equal((Date.parse(n.end) - Date.parse(n.start)) / 3600000, h);
+  }
+});
+test("station bounds and block allocation precedence", () => {
+  const d = "2026-01-03";
+  assert.throws(() =>
+    generateRoster({
+      platoon: "A",
+      from: d,
+      to: d,
+      stations: [{ stationId: 97, from: d }],
+    }),
+  );
+  const r = generateRoster({
+    platoon: "A",
+    from: d,
+    to: d,
+    stations: [
+      { stationId: 1, from: d },
+      { stationId: 2, from: d, block: rosterBlock(d) },
+    ],
+  });
+  assert.equal(r.shifts[0].stationId, 2);
+});
+test("Z must not duplicate a shift when explicit Day Work overlaps", () => {
+  const d = "2026-10-19";
+  const r = generateRoster({
+    platoon: "Z",
+    from: d,
+    to: d,
+    dayWork: [{ start: instant(d, 8), end: instant(d, 18) }],
+  });
+  assert.equal(r.shifts.length, 1);
+});
+test("Day Work outside range must not leak shifts into range", () => {
+  const d = "2026-10-19";
+  const r = generateRoster({
+    platoon: "A",
+    from: d,
+    to: d,
+    dayWork: [
+      { start: instant("2026-10-18", 8), end: instant("2026-10-18", 18) },
+    ],
+  });
+  assert.equal(r.shifts.filter((x) => x.kind === "Day Work").length, 0);
+});
+test("station move reminder is not emitted for one shift temporary relief", () => {
+  const r = generateRoster({
+    platoon: "A",
+    from: "2026-01-03",
+    to: "2026-01-12",
+    stations: [
+      { stationId: 1, from: "2026-01-01" },
+      {
+        stationId: 22,
+        from: "2026-01-05",
+        to: "2026-01-05",
+        temporary: true,
+        oneShiftRelief: true,
+      },
+    ],
+  });
+  assert.equal(r.gearReminders.length, 0);
+});
+test("overlapping Day Work records are refused", () => {
+  const d = "2026-01-03";
+  assert.throws(
+    () =>
+      generateRoster({
+        platoon: "A",
+        from: d,
+        to: d,
+        dayWork: [
+          { start: instant(d, 8), end: instant(d, 18) },
+          { start: instant(d, 8), end: instant(d, 18) },
+        ],
+      }),
+    /Overlapping Day Work/,
+  );
+});
