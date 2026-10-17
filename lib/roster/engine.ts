@@ -100,7 +100,7 @@ function cut(shift: Shift, windows: [number, number][]): Shift[] {
           ].filter(([u, v]) => u < v) as [number, number][]),
     );
   }
-  return pieces.map(([a, b], j) => ({
+  return pieces.map(([a, b]) => ({
     ...shift,
     key: shift.key + ":" + new Date(a).toISOString(),
     start: new Date(a).toISOString(),
@@ -122,59 +122,44 @@ function station(s: Shift, all: Station[]) {
       a.stationId - b.stationId,
   )[0];
 }
-export function generateRoster(
-  i: Input,
-  internal = false,
-): {
+export function generateRoster(i: Input): {
   shifts: Shift[];
   gearReminders: Reminder[];
 } {
-  if (!["A", "B", "C", "D", "Z"].includes(i.platoon))
-    throw Error("Invalid platoon");
   const from = validDate(i.from),
     to = validDate(i.to);
-  if (to < from || (!internal && to - from > 5 * 366 * DAY))
-    throw Error("Invalid range");
-  // Expand only the calculation horizon, not the returned shifts, so the
-  // last old-station shift and first new-station shift remain visible across
-  // independent windows. A 16-day lookaround covers the 8-day platoon cycle.
-  if (!internal) {
-    const maximumLeaveDays = Math.max(
-      0,
-      ...(i.leave || []).map((l) =>
-        Math.max(
-          0,
-          Math.round((validDate(l.end) - validDate(l.start)) / DAY) + 1,
-        ),
-      ),
-    );
-    const totalLeaveDays = (i.leave || []).reduce(
-      (sum, l) =>
-        sum +
-        Math.max(
-          0,
-          Math.round((validDate(l.end) - validDate(l.start)) / DAY) + 1,
-        ),
-      0,
-    );
-    const reliefDays = (i.stations || []).filter(
-      (a) => a.oneShiftRelief,
-    ).length;
-    const pad =
-      16 + Math.max(maximumLeaveDays, totalLeaveDays) + 8 * reliefDays;
-    const before = date(from - pad * DAY);
-    const after = date(to + pad * DAY);
-    const expanded = generateRoster({ ...i, from: before, to: after }, true);
-    const boundaryEnd = Date.parse(instant(date(to + DAY), 0));
-    const boundaryStart = Date.parse(instant(i.from, 0));
-    return {
-      shifts: expanded.shifts.filter((s) => s.date >= i.from && s.date <= i.to),
-      gearReminders: expanded.gearReminders.filter(
-        (r) =>
-          Date.parse(r.at) >= boundaryStart && Date.parse(r.at) < boundaryEnd,
-      ),
-    };
-  }
+  if (to < from || to - from > 5 * 366 * DAY) throw Error("Invalid range");
+  // Only bounded, explicitly supplied exclusions can enlarge the context.
+  const totalLeaveDays = (i.leave || []).reduce((sum, l) => {
+    const a = validDate(l.start),
+      b = validDate(l.end);
+    if (b < a || b - a > 5 * 366 * DAY) throw Error("Invalid leave horizon");
+    return sum + Math.round((b - a) / DAY) + 1;
+  }, 0);
+  if (totalLeaveDays > 5 * 366) throw Error("Excessive leave horizon");
+  const reliefDays = (i.stations || []).filter((a) => a.oneShiftRelief).length;
+  const pad = 16 + totalLeaveDays + 8 * reliefDays;
+  if (pad > 5 * 366 * 9) throw Error("Excessive calculation horizon");
+  const expanded = generateExpandedRoster({
+    ...i,
+    from: date(from - pad * DAY),
+    to: date(to + pad * DAY),
+  });
+  const lower = Date.parse(instant(i.from, 0)),
+    upper = Date.parse(instant(date(to + DAY), 0));
+  return {
+    shifts: expanded.shifts.filter((s) => s.date >= i.from && s.date <= i.to),
+    gearReminders: expanded.gearReminders.filter(
+      (r) => Date.parse(r.at) >= lower && Date.parse(r.at) < upper,
+    ),
+  };
+}
+function generateExpandedRoster(i: Input): {
+  shifts: Shift[];
+  gearReminders: Reminder[];
+} {
+  const from = validDate(i.from),
+    to = validDate(i.to);
   const leave = intervals(
     (i.leave || []).map((l) => {
       if (
@@ -272,11 +257,10 @@ export function generateRoster(
   // Explicit Day Work overrides replace, rather than overlap, base shifts.
   for (let k = 0; k < work.length; k++) {
     const [a, b] = work[k];
-    for (
-      let t = Math.max(from, Math.floor(a / DAY) * DAY - DAY);
-      t <= to;
-      t += DAY
-    ) {
+    const first = Math.max(from, Math.floor(a / DAY) * DAY - DAY);
+    for (let t = first; t <= to; t += DAY) {
+      // All subsequent local 08:00 windows start after this Day Work interval.
+      if (Date.parse(instant(date(t), 8)) >= b) break;
       const d = date(t);
       const start = Date.parse(instant(d, 8)),
         end = Date.parse(instant(d, 18));

@@ -460,3 +460,98 @@ test("consecutive single-shift reliefs preserve split-window reminders", () => {
   assert.deepEqual(split, whole);
   assert.ok(whole.some((r) => r.title === "Move FF Gear to FS5"));
 });
+test("every split boundary preserves reminder parity across a station move", () => {
+  const base = {
+    platoon: "A" as const,
+    stations: [
+      { stationId: 1, from: "2026-01-01" },
+      { stationId: 5, from: "2026-01-11" },
+    ],
+  };
+  const full = generateRoster({
+    ...base,
+    from: "2026-01-01",
+    to: "2026-02-10",
+  }).gearReminders;
+  for (
+    let d = Date.parse("2026-01-02T00:00:00Z");
+    d < Date.parse("2026-02-10T00:00:00Z");
+    d += 86400000
+  ) {
+    const a = new Date(d).toISOString().slice(0, 10);
+    const b = new Date(d + 86400000).toISOString().slice(0, 10);
+    const split = [
+      ...generateRoster({ ...base, from: "2026-01-01", to: a }).gearReminders,
+      ...generateRoster({ ...base, from: b, to: "2026-02-10" }).gearReminders,
+    ];
+    assert.deepEqual(split, full, a);
+  }
+});
+test("Z platoon split-window and partial Day Work preserve reminder parity", () => {
+  const base = {
+    platoon: "Z" as const,
+    stations: [
+      { stationId: 1, from: "2026-10-01" },
+      { stationId: 5, from: "2026-10-21" },
+    ],
+    dayWork: [
+      { start: instant("2026-10-19", 10), end: instant("2026-10-19", 14) },
+    ],
+  };
+  const whole = generateRoster({
+    ...base,
+    from: "2026-10-18",
+    to: "2026-10-30",
+  }).gearReminders;
+  const split = [
+    ...generateRoster({ ...base, from: "2026-10-18", to: "2026-10-20" })
+      .gearReminders,
+    ...generateRoster({ ...base, from: "2026-10-21", to: "2026-10-30" })
+      .gearReminders,
+  ];
+  assert.deepEqual(split, whole);
+});
+test("reject unreasonably long leave instead of unbounded calculation", () => {
+  assert.throws(
+    () =>
+      generateRoster({
+        platoon: "A",
+        from: "2026-01-01",
+        to: "2026-01-31",
+        leave: [
+          {
+            period: "excess",
+            startingRosterBlock: rosterBlock("2026-01-01"),
+            start: "2026-01-01",
+            end: "2100-01-01",
+          },
+        ],
+      }),
+    /Invalid leave horizon/,
+  );
+});
+test("night shift reminder across adjacent calendar windows remains uniquely owned", () => {
+  const base = {
+    platoon: "A" as const,
+    stations: [
+      { stationId: 1, from: "2026-01-01" },
+      { stationId: 5, from: "2026-01-06" },
+    ],
+  };
+  const a = generateRoster({
+    ...base,
+    from: "2026-01-01",
+    to: "2026-01-05",
+  }).gearReminders;
+  const b = generateRoster({
+    ...base,
+    from: "2026-01-06",
+    to: "2026-01-15",
+  }).gearReminders;
+  const whole = generateRoster({
+    ...base,
+    from: "2026-01-01",
+    to: "2026-01-15",
+  }).gearReminders;
+  assert.deepEqual([...a, ...b], whole);
+});
