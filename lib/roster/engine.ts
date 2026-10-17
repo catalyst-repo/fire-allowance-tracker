@@ -171,6 +171,10 @@ export function generateRoster(i: Input): {
       x.day !== y.day ||
       Number(x.hour) < 8 ||
       Number(y.hour) > 18 ||
+      (Number(y.hour) === 18 &&
+        (Number(y.minute) !== 0 ||
+          b !==
+            Date.parse(instant(x.year + "-" + x.month + "-" + x.day, 18)))) ||
       Number(x.hour) >= 18 ||
       Number(y.hour) < 8
     )

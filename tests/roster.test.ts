@@ -300,3 +300,21 @@ test("reject malformed one-shift relief allocations", () => {
     }),
   );
 });
+test("Day Work ending at 18:30 is rejected without dropping night hours", () => {
+  const d = "2026-01-05";
+  assert.throws(
+    () =>
+      generateRoster({
+        platoon: "A",
+        from: d,
+        to: d,
+        dayWork: [
+          {
+            start: instant(d, 8),
+            end: new Date(Date.parse(instant(d, 18)) + 1800000).toISOString(),
+          },
+        ],
+      }),
+    /Day Work must/,
+  );
+});
