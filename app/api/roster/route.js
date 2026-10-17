@@ -24,6 +24,17 @@ function date(s) {
     fail("invalid date");
   return s;
 }
+function record(x, name) {
+  if (!x || typeof x !== "object" || Array.isArray(x)) fail("invalid " + name);
+  return x;
+}
+function validateEngine(input) {
+  try {
+    return generateRoster(input);
+  } catch (e) {
+    fail(e?.message || "invalid roster");
+  }
+}
 function limit(a, name) {
   if (!Array.isArray(a) || a.length > MAX_RECORDS) fail("invalid " + name);
   return a;
@@ -67,6 +78,7 @@ async function saveConfig(db, input) {
   const platoon = input.platoon;
   if (!["A", "B", "C", "D", "Z"].includes(platoon)) fail("invalid platoon");
   const leave = limit(input.leave, "leave").map((l) => {
+    l = record(l, "leave");
     const start = date(l.start),
       end = date(l.end),
       period = text(l.period, "period");
@@ -74,11 +86,15 @@ async function saveConfig(db, input) {
       fail("invalid leave");
     return { period, start, end, block: l.startingRosterBlock };
   });
-  const dayWork = limit(input.dayWork, "dayWork").map((w) => ({
-    start: text(w.start, "start", 64),
-    end: text(w.end, "end", 64),
-  }));
+  const dayWork = limit(input.dayWork, "dayWork").map((item) => {
+    const w = record(item, "dayWork");
+    return {
+      start: text(w.start, "start", 64),
+      end: text(w.end, "end", 64),
+    };
+  });
   const stations = limit(input.stations, "stations").map((s) => {
+    s = record(s, "station");
     const from = date(s.from),
       to = s.to == null ? null : date(s.to),
       stationId = s.stationId;
@@ -104,7 +120,7 @@ async function saveConfig(db, input) {
   });
   // Call the P1 engine to validate precedence, interval overlap and locale handling
   // before changing ANY row; transaction rollback protects against insert failures.
-  generateRoster({
+  validateEngine({
     platoon,
     from: "2026-10-01",
     to: "2026-10-02",
@@ -150,7 +166,7 @@ async function saveConfig(db, input) {
   return { ok: true };
 }
 export const dynamic = "force-dynamic";
-export const POST = memberRoute(async ({ req, db }) => {
+const guardedMemberPost = memberRoute(async ({ req, db }) => {
   await permitted(db);
   const input = await readJson(req);
   if (!input || typeof input !== "object" || Array.isArray(input))
@@ -163,7 +179,18 @@ export const POST = memberRoute(async ({ req, db }) => {
       throw new RequestError("roster not configured", "NOT_FOUND", 404);
     const from = date(input.from),
       to = date(input.to);
-    return generateRoster({ ...config, from, to });
+    return validateEngine({ ...config, from, to });
   }
   throw new RequestError("unknown action", "NOT_FOUND", 404);
 });
+
+export const POST = (req, ctx) =>
+  allowedEnvironment()
+    ? guardedMemberPost(req, ctx)
+    : new Response(JSON.stringify({ error: "NOT_FOUND" }), {
+        status: 404,
+        headers: {
+          "content-type": "application/json",
+          "cache-control": "no-store",
+        },
+      });
