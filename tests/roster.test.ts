@@ -567,3 +567,118 @@ test("night shift reminder across adjacent calendar windows remains uniquely own
   }).gearReminders;
   assert.deepEqual([...a, ...b], whole);
 });
+test("five-year request bound accepts final allowed day and rejects next", () => {
+  const from = "2026-01-01",
+    last = new Date(Date.parse(from + "T00:00:00Z") + 1830 * 86400000)
+      .toISOString()
+      .slice(0, 10),
+    excess = new Date(Date.parse(from + "T00:00:00Z") + 1831 * 86400000)
+      .toISOString()
+      .slice(0, 10);
+  assert.doesNotThrow(() => generateRoster({ platoon: "Z", from, to: last }));
+  assert.throws(
+    () => generateRoster({ platoon: "Z", from, to: excess }),
+    /Invalid range/,
+  );
+});
+test("leave starts on night shift date cancels full shift at DST boundary", () => {
+  const d = "2027-04-03",
+    p = resolveNightPlatoon(d) as "A" | "B" | "C" | "D";
+  const r = generateRoster({
+    platoon: p,
+    from: d,
+    to: d,
+    leave: [
+      { period: "L", startingRosterBlock: rosterBlock(d), start: d, end: d },
+    ],
+  });
+  assert.equal(r.shifts.filter((s) => s.kind === "Night").length, 0);
+});
+test("overlapping leave records still cancel whole night shift", () => {
+  const d = "2026-01-05",
+    p = resolveNightPlatoon(d) as "A" | "B" | "C" | "D";
+  const r = generateRoster({
+    platoon: p,
+    from: d,
+    to: d,
+    leave: [
+      { period: "L1", startingRosterBlock: rosterBlock(d), start: d, end: d },
+      {
+        period: "L2",
+        startingRosterBlock: rosterBlock(d),
+        start: d,
+        end: "2026-01-06",
+      },
+    ],
+  });
+  assert.equal(r.shifts.filter((s) => s.kind === "Night").length, 0);
+});
+test("maximum supported caller range is accepted and next day rejected", () => {
+  const from = "2026-01-01";
+  const end = new Date(Date.parse(from + "T00:00:00Z") + 1830 * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  assert.doesNotThrow(() => generateRoster({ platoon: "A", from, to: end }));
+  const beyond = new Date(Date.parse(end + "T00:00:00Z") + 86400000)
+    .toISOString()
+    .slice(0, 10);
+  assert.throws(
+    () => generateRoster({ platoon: "A", from, to: beyond }),
+    /Invalid range/,
+  );
+});
+test("sum of distinct leave periods is capped", () => {
+  const leave = [
+    {
+      period: "L1",
+      startingRosterBlock: rosterBlock("2026-01-01"),
+      start: "2026-01-01",
+      end: "2028-07-01",
+    },
+    {
+      period: "L2",
+      startingRosterBlock: rosterBlock("2028-07-02"),
+      start: "2028-07-02",
+      end: "2031-01-01",
+    },
+  ];
+  assert.throws(
+    () =>
+      generateRoster({
+        platoon: "A",
+        from: "2026-01-01",
+        to: "2026-01-31",
+        leave,
+      }),
+    /Excessive leave horizon/,
+  );
+});
+test("reminder exactly at Melbourne midnight belongs to next window", () => {
+  const base = {
+    platoon: "A" as const,
+    stations: [
+      { stationId: 1, from: "2026-01-01" },
+      { stationId: 5, from: "2026-01-06" },
+    ],
+    leave: [
+      {
+        period: "L",
+        startingRosterBlock: rosterBlock("2026-01-06"),
+        start: "2026-01-06",
+        end: "2026-01-07",
+      },
+    ],
+  };
+  const full = generateRoster({
+    ...base,
+    from: "2026-01-01",
+    to: "2026-01-20",
+  }).gearReminders;
+  const split = [
+    ...generateRoster({ ...base, from: "2026-01-01", to: "2026-01-05" })
+      .gearReminders,
+    ...generateRoster({ ...base, from: "2026-01-06", to: "2026-01-20" })
+      .gearReminders,
+  ];
+  assert.deepEqual(split, full);
+});
