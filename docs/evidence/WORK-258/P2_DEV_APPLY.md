@@ -32,3 +32,15 @@ This record concerns only Neon DEV; it is not P2 acceptance, PR merge or deploym
 - A local Next production source compile passed; full page-data collection is blocked by unrelated missing legacy Supabase environment variables in the isolated worktree. No production credentials were supplied.
 - DEV Preview HTTP flow, live auth and real two-user HTTP-level isolation remain post-deployment acceptance gates.
 - Destructive rollback is explicitly reserved for separate authorisation.
+
+## Subsequent read-only independent P2 review and security correction
+
+Claude Code reviewed task PR #52 at commit 066ade1 independently and identified late API gate enforcement, unhandled roster-input validation errors, and excess fat_service privileges.
+
+- API correction on task branch: global gate evaluated before auth / identity resolution; null array elements rejected as BAD_ROSTER (400); P1 engine input validation failures converted to BAD_ROSTER (400).
+- Original already-applied migration 20261017195000 remains unmodified.
+- Separate DEV correction migration 20261017205500_fat_roster_least_privilege.sql, recorded SHA-256 dcd3dabea14d166b3ad592826242eb619b233c9ae8040be05ebb28ebef07d93e.
+- Fresh explicit Neon DEV branch observation and governance-v2 backend preflight returned allow for change 20261017205500; checksum-guarded SQL applied only to DEV and fresh ledger verified.
+- Governance-v2 verify-applied returned verified; all four roster_service policies removed. Fresh privilege checks show fat_service has NO SELECT, INSERT, UPDATE or DELETE on any roster table; four fat_app owner policies remain.
+- PR preview /roster and POST /api/roster both returned 404 with feature disabled. Global FAT_ROSTER_ENABLED remains absent; no production or OAuth changes.
+- Authenticating a synthetic user against an enabled preview remains blocked by the approved gate's dev-only branch restriction and requires separate explicit approval for a safe preview mechanism. The read-only review recommends either a disposable local DEV-derived Neon branch and dev HTTP setup or a narrowly scoped preview-branch gate. Neither was silently enabled.
