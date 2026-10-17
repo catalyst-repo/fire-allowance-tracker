@@ -160,21 +160,22 @@ function generateExpandedRoster(i: Input): {
 } {
   const from = validDate(i.from),
     to = validDate(i.to);
-  const leave = intervals(
-    (i.leave || []).map((l) => {
-      if (
-        !l.period ||
-        !Number.isInteger(l.startingRosterBlock) ||
-        rosterBlock(l.start) !== l.startingRosterBlock ||
-        validDate(l.end) < validDate(l.start)
-      )
-        throw Error("Invalid leave");
-      return {
-        start: instant(l.start, 0),
-        end: instant(date(validDate(l.end) + DAY), 0),
-      };
-    }),
-  );
+  // P1 operator-approved policy: annual leave cancels WHOLE shifts by the
+  // Melbourne start date, including nights ending the following morning.
+  // FRV EBA 2020 cl 101.1.2 specifies 28-day leave periods but does not
+  // expressly resolve overnight boundary treatment.
+  const leaveDates = (i.leave || []).map((l) => {
+    if (
+      !l.period ||
+      !Number.isInteger(l.startingRosterBlock) ||
+      rosterBlock(l.start) !== l.startingRosterBlock ||
+      validDate(l.end) < validDate(l.start)
+    )
+      throw Error("Invalid leave");
+    return [l.start, l.end] as [string, string];
+  });
+  const onLeave = (startDate: string) =>
+    leaveDates.some(([a, b]) => a <= startDate && startDate <= b);
   const work = intervals(i.dayWork || []);
   for (const [a, b] of work) {
     const part = (t: number) =>
@@ -248,7 +249,8 @@ function generateExpandedRoster(i: Input): {
       };
     });
     for (const s of base) {
-      for (const part of cut(s, [...work, ...leave])) {
+      if (onLeave(s.date)) continue;
+      for (const part of cut(s, work)) {
         const a = station(part, i.stations || []);
         shifts.push(a ? { ...part, stationId: a.stationId } : part);
       }
@@ -273,7 +275,8 @@ function generateExpandedRoster(i: Input): {
         start: new Date(Math.max(start, a)).toISOString(),
         end: new Date(Math.min(end, b)).toISOString(),
       };
-      for (const part of cut(s, leave)) {
+      if (onLeave(s.date)) continue;
+      for (const part of cut(s, [])) {
         const st = station(part, i.stations || []);
         shifts.push(st ? { ...part, stationId: st.stationId } : part);
       }

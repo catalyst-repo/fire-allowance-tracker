@@ -81,25 +81,26 @@ test("idempotent and invalid input rejected", () => {
   assert.deepEqual(generateRoster(i), generateRoster(i));
   assert.throws(() => generateRoster({ ...i, from: "not-date" }));
 });
-test("night shift crossing leave midnight is clipped, not retained whole", () => {
-  const date = "2026-01-05";
-  const p = resolveNightPlatoon(date) as "A" | "B" | "C" | "D";
-  const result = generateRoster({
+test("leave on next date preserves full overnight shift from previous date", () => {
+  const d = "2026-01-05";
+  const p = resolveNightPlatoon(d) as "A" | "B" | "C" | "D";
+  const r = generateRoster({
     platoon: p,
-    from: date,
-    to: date,
+    from: d,
+    to: d,
     leave: [
       {
-        period: "1",
+        period: "L",
         startingRosterBlock: rosterBlock("2026-01-06"),
         start: "2026-01-06",
         end: "2026-01-06",
       },
     ],
   });
-  const night = result.shifts.find((s) => s.kind === "Night");
+  const night = r.shifts.find((s) => s.kind === "Night");
   assert.ok(night);
-  assert.equal(night.end, instant("2026-01-06", 0));
+  assert.equal(night.start, instant(d, 18));
+  assert.equal(night.end, instant("2026-01-06", 8));
 });
 test("explicit Day Work suppresses operational overlap and generates replacement", () => {
   const d = "2026-01-03",
@@ -242,22 +243,20 @@ test("offsetless intervals are rejected for deterministic timezones", () => {
     /Explicit timezone/,
   );
 });
-test("fragment keys change with fragment start", () => {
+test("annual leave cancels night shift completely without orphan fragments", () => {
   const d = "2026-01-05";
   const p = resolveNightPlatoon(d) as "A" | "B" | "C" | "D";
-  const full = generateRoster({ platoon: p, from: d, to: d }).shifts.find(
-    (x) => x.kind === "Night",
-  );
-  const clipped = generateRoster({
+  const base = generateRoster({ platoon: p, from: d, to: d });
+  assert.ok(base.shifts.some((s) => s.kind === "Night"));
+  const leave = generateRoster({
     platoon: p,
     from: d,
     to: d,
     leave: [
-      { period: "x", startingRosterBlock: rosterBlock(d), start: d, end: d },
+      { period: "L", startingRosterBlock: rosterBlock(d), start: d, end: d },
     ],
-  }).shifts.find((x) => x.kind === "Night");
-  assert.ok(full && clipped);
-  assert.notEqual(full.key, clipped.key);
+  });
+  assert.equal(leave.shifts.filter((s) => s.kind === "Night").length, 0);
 });
 test("temporary station departure receives a gear reminder", () => {
   const r = generateRoster({
@@ -339,10 +338,10 @@ test("gear reminders are identical for whole and split request windows", () => {
   ];
   assert.deepEqual(split, whole);
 });
-test("leave is a Melbourne calendar-date interval; night fragments are clipped hourly", () => {
+test("leave at shift start removes whole night; next-day leave does not", () => {
   const d = "2026-01-05";
   const p = resolveNightPlatoon(d) as "A" | "B" | "C" | "D";
-  const r = generateRoster({
+  const leaveOnStart = generateRoster({
     platoon: p,
     from: d,
     to: d,
@@ -350,9 +349,22 @@ test("leave is a Melbourne calendar-date interval; night fragments are clipped h
       { period: "L", startingRosterBlock: rosterBlock(d), start: d, end: d },
     ],
   });
-  const n = r.shifts.find((x) => x.kind === "Night");
+  assert.equal(leaveOnStart.shifts.filter((s) => s.kind === "Night").length, 0);
+  const leaveNext = generateRoster({
+    platoon: p,
+    from: d,
+    to: d,
+    leave: [
+      {
+        period: "L",
+        startingRosterBlock: rosterBlock("2026-01-06"),
+        start: "2026-01-06",
+        end: "2026-01-06",
+      },
+    ],
+  });
+  const n = leaveNext.shifts.find((s) => s.kind === "Night");
   assert.ok(n);
-  assert.equal(n.start, instant("2026-01-06", 0));
   assert.equal(n.end, instant("2026-01-06", 8));
 });
 test("long leave preserves identical split-window gear reminders", () => {
