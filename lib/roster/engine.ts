@@ -148,7 +148,20 @@ export function generateRoster(
         ),
       ),
     );
-    const pad = 16 + maximumLeaveDays;
+    const totalLeaveDays = (i.leave || []).reduce(
+      (sum, l) =>
+        sum +
+        Math.max(
+          0,
+          Math.round((validDate(l.end) - validDate(l.start)) / DAY) + 1,
+        ),
+      0,
+    );
+    const reliefDays = (i.stations || []).filter(
+      (a) => a.oneShiftRelief,
+    ).length;
+    const pad =
+      16 + Math.max(maximumLeaveDays, totalLeaveDays) + 8 * reliefDays;
     const before = date(from - pad * DAY);
     const after = date(to + pad * DAY);
     const expanded = generateRoster({ ...i, from: before, to: after }, true);

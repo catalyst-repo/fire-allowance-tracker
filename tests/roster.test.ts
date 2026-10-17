@@ -383,3 +383,80 @@ test("long leave preserves identical split-window gear reminders", () => {
   assert.deepEqual(split, whole);
   assert.ok(whole.some((x) => x.title === "Move FF Gear to FS5"));
 });
+test("adjacent leave periods preserve split-window gear reminders", () => {
+  const base = {
+    platoon: "A" as const,
+    stations: [
+      { stationId: 1, from: "2026-01-01" },
+      { stationId: 5, from: "2026-02-01" },
+    ],
+    leave: [
+      {
+        period: "L1",
+        startingRosterBlock: rosterBlock("2026-01-13"),
+        start: "2026-01-13",
+        end: "2026-02-09",
+      },
+      {
+        period: "L2",
+        startingRosterBlock: rosterBlock("2026-02-10"),
+        start: "2026-02-10",
+        end: "2026-03-09",
+      },
+    ],
+  };
+  const whole = generateRoster({
+    ...base,
+    from: "2026-01-01",
+    to: "2026-03-31",
+  }).gearReminders;
+  const split = [
+    ...generateRoster({ ...base, from: "2026-01-01", to: "2026-01-12" })
+      .gearReminders,
+    ...generateRoster({ ...base, from: "2026-01-13", to: "2026-03-31" })
+      .gearReminders,
+  ];
+  assert.deepEqual(split, whole);
+  assert.ok(whole.some((r) => r.title === "Move FF Gear to FS5"));
+});
+test("consecutive single-shift reliefs preserve split-window reminders", () => {
+  const relief = [
+    "2026-01-13",
+    "2026-01-14",
+    "2026-01-19",
+    "2026-01-20",
+    "2026-01-21",
+    "2026-01-22",
+    "2026-01-27",
+    "2026-01-28",
+    "2026-01-29",
+    "2026-01-30",
+  ].map((d) => ({
+    stationId: 22,
+    from: d,
+    to: d,
+    temporary: true,
+    oneShiftRelief: true,
+  }));
+  const base = {
+    platoon: "A" as const,
+    stations: [
+      { stationId: 1, from: "2026-01-01" },
+      { stationId: 5, from: "2026-02-01" },
+      ...relief,
+    ],
+  };
+  const whole = generateRoster({
+    ...base,
+    from: "2026-01-01",
+    to: "2026-02-28",
+  }).gearReminders;
+  const split = [
+    ...generateRoster({ ...base, from: "2026-01-01", to: "2026-01-12" })
+      .gearReminders,
+    ...generateRoster({ ...base, from: "2026-01-13", to: "2026-02-28" })
+      .gearReminders,
+  ];
+  assert.deepEqual(split, whole);
+  assert.ok(whole.some((r) => r.title === "Move FF Gear to FS5"));
+});
