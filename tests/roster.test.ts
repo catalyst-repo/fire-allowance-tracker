@@ -639,7 +639,7 @@ test("sum of distinct leave periods is capped", () => {
       period: "L2",
       startingRosterBlock: rosterBlock("2028-07-02"),
       start: "2028-07-02",
-      end: "2031-01-01",
+      end: "2031-03-01",
     },
   ];
   assert.throws(
